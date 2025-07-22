@@ -1,0 +1,1498 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LEAN-LLM-OPT</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/dompurify/dist/purify.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css" />
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/contrib/auto-render.min.js"
+            onload="renderMathInElement(document.body, {
+                delimiters: [
+                    {left: '$$', right: '$$', display: true},
+                    {left: '$', right: '$', display: false},
+                    {left: '\\\\(', right: '\\\\)', display: false},
+                    {left: '\\\\begin{equation}', right: '\\\\end{equation}', display: true},
+                    {left: '\\\\begin{align}', right: '\\\\end{align}', display: true},
+                    {left: '\\\\begin{alignat}', right: '\\\\end{alignat}', display: true},
+                    {left: '\\\\begin{gather}', right: '\\\\end{gather}', display: true},
+                    {left: '\\\\begin{CD}', right: '\\\\end{CD}', display: true},
+                    {left: '\\\\[', right: '\\\\]', display: true}
+                ],
+                macros: {
+                    '\\\\text': '\\\\text',
+                    '\\\\frac': '\\\\frac',
+                    '--': '\\\\cdot'
+                }
+            });">
+    </script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/languages/python.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        /* Enhanced fonts and colors with modern design */
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", Helvetica, Arial, sans-serif;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            min-height: 100vh;
+        }
+
+        .sidebar {
+            background: linear-gradient(180deg, rgba(102, 126, 234, 0.8) 0%, rgba(118, 75, 162, 0.8) 100%);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15), 0 0 0 1px rgba(255, 255, 255, 0.2);
+            width: 24%;
+            color: #ffffff;
+            border-radius: 1.5rem;
+            margin-right: 2rem;
+            position: relative;
+            flex-shrink: 0;
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+
+        .slide-up {
+            animation: slideUp 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+        }
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px) scale(0.95);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+        .preview-table {
+            max-height: 400px;
+            overflow-y: auto;
+            border-radius: 1rem;
+            background: rgba(255, 255, 255, 0.8);
+            backdrop-filter: blur(10px);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        }
+        .preview-table table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.7rem;
+            color: #272343;
+        }
+        .preview-table th {
+            position: sticky;
+            top: 0;
+            background: rgba(102, 126, 234, 0.08);
+            backdrop-filter: blur(15px);
+            z-index: 10;
+            padding: 0.5rem 0.75rem;
+            font-weight: 600;
+            border-radius: 0.75rem;
+            color: rgba(102, 126, 234, 0.9);
+            border-bottom: 2px solid rgba(102, 126, 234, 0.15);
+        }
+        .preview-table td {
+            padding: 0.5rem 0.75rem;
+            border-top: 1px solid rgba(102, 126, 234, 0.08);
+            border-radius: 0.5rem;
+            transition: all 0.2s ease;
+        }
+        
+        .preview-table tr:hover td {
+            background: rgba(102, 126, 234, 0.04);
+            transform: scale(1.01);
+        }
+
+        /* Enhanced loading indicator with glassmorphism */
+        .loading-indicator {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 1rem 1.5rem;
+            background: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(20px);
+            color: #272343;
+            border-radius: 1.5rem;
+            margin-top: 0.5rem;
+            margin-left: 0;
+            max-width: fit-content;
+            animation: slideIn 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+            margin-right: auto;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px) scale(0.95);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+        .loading-spinner {
+            width: 24px;
+            height: 24px;
+            border: 3px solid rgba(59, 130, 246, 0.2);
+            border-top: 3px solid #3b82f6;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            transform-origin: center;
+            display: inline-block;
+            will-change: transform;
+            backface-visibility: hidden;
+            -webkit-transform: translateZ(0);
+            -webkit-backface-visibility: hidden;
+            -webkit-perspective: 1000;
+            box-shadow: 0 0 20px rgba(59, 130, 246, 0.3);
+        }
+        
+        /* 省略号动画 */
+        .loading-dots::after {
+            content: "";
+            animation: dots 1.5s infinite;
+        }
+        
+        @keyframes dots {
+            0%, 20% {
+                content: "";
+            }
+            40% {
+                content: ".";
+            }
+            60% {
+                content: "..";
+            }
+            80%, 100% {
+                content: "...";
+            }
+        }
+        @keyframes spin {
+            0% { 
+                transform: rotate(0deg);
+                -webkit-transform: rotate(0deg);
+            }
+            100% { 
+                transform: rotate(360deg);
+                -webkit-transform: rotate(360deg);
+            }
+        }
+        
+        /* 添加更多丝滑动画 */
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        @keyframes pulse {
+            0%, 100% {
+                opacity: 1;
+            }
+            50% {
+                opacity: 0.7;
+            }
+        }
+        
+        @keyframes bounce {
+            0%, 20%, 53%, 80%, 100% {
+                transform: translate3d(0,0,0);
+            }
+            40%, 43% {
+                transform: translate3d(0, -8px, 0);
+            }
+            70% {
+                transform: translate3d(0, -4px, 0);
+            }
+            90% {
+                transform: translate3d(0, -2px, 0);
+            }
+        }
+        
+        @keyframes rotate {
+            from {
+                transform: rotate(0deg);
+            }
+            to {
+                transform: rotate(360deg);
+            }
+        }
+        
+        @keyframes float {
+            0%, 100% {
+                transform: translateY(0px);
+            }
+            50% {
+                transform: translateY(-10px);
+            }
+        }
+        
+        @keyframes pulse-glow {
+            0%, 100% {
+                box-shadow: 0 0 20px rgba(102, 126, 234, 0.3);
+            }
+            50% {
+                box-shadow: 0 0 40px rgba(102, 126, 234, 0.6);
+            }
+        }
+        .loading-text {
+            font-size: 0.875rem;
+            color: #272343;
+            font-weight: 500;
+            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Helvetica, Arial, sans-serif;
+        }
+        .loading-progress {
+            font-size: 0.75rem;
+            color: #272343;
+            margin-left: 0.5rem;
+            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Helvetica, Arial, sans-serif;
+        }
+        .main-container {
+            display: flex;
+            height: 100vh;
+            width: 100%;
+        }
+        .right-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-width: 0;
+        }
+        .chat-container {
+            flex: 1;
+            overflow-y: auto;
+            padding: 2rem;
+            padding-bottom: 280px;
+        }
+        .chat-message {
+            max-width: 70%;
+            margin-bottom: 1.5rem;
+            border-radius: 1.5rem;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+            animation: fadeInUp 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            overflow: hidden;
+        }
+        .chat-message::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(45deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+            transform: translateX(-100%);
+            transition: transform 0.6s ease;
+        }
+        .chat-message:hover::before {
+            transform: translateX(100%);
+        }
+        .chat-message.user {
+            margin-left: auto;
+            background: linear-gradient(135deg, rgba(102, 126, 234, 0.9) 0%, rgba(118, 75, 162, 0.9) 100%);
+            color: #ffffff;
+            box-shadow: 0 8px 32px rgba(102, 126, 234, 0.25);
+        }
+        .chat-message.assistant {
+            margin-right: auto;
+            background: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(20px);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+        .chat-message-content {
+            padding: 1.25rem;
+            border-radius: 1.5rem;
+            overflow-x: auto;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+            position: relative;
+            z-index: 1;
+        }
+        .problem-description-container {
+            position: fixed;
+            bottom: 0;
+            left: calc(24% + 2rem);
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(20px);
+            box-shadow: 0 -8px 32px rgba(0,0,0,0.15);
+            padding: 2rem;
+            z-index: 40;
+            width: calc(76% - 2rem);
+            border-radius: 1.5rem;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+        .problem-description-inner {
+            margin: 0 auto;
+        }
+        .auto-resize-textarea {
+            min-height: 60px;
+            max-height: 200px;
+            resize: none;
+            overflow-y: auto;
+            scrollbar-width: thin;
+            scrollbar-color: #cbd5e1 #f1f5f9;
+            border-radius: 1.5rem;
+            border: 2px solid rgba(102, 126, 234, 0.2);
+            transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+            background: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(10px);
+        }
+        
+        .auto-resize-textarea:focus {
+            border-color: #667eea;
+            box-shadow: 0 0 20px rgba(102, 126, 234, 0.3);
+            transform: translateY(-2px);
+        }
+        
+        .auto-resize-textarea::-webkit-scrollbar {
+            width: 6px;
+        }
+        .auto-resize-textarea::-webkit-scrollbar-track {
+            background: #f1f5f9;
+            border-radius: 3px;
+        }
+        .auto-resize-textarea::-webkit-scrollbar-thumb {
+            background-color: #cbd5e1;
+            border-radius: 3px;
+        }
+        .welcome-message {
+            text-align: center;
+            padding: 3rem;
+            color: #272343;
+            border-radius: 2rem;
+            animation: fadeInUp 1s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+            background: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(20px);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .welcome-message::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: linear-gradient(45deg, transparent, rgba(102, 126, 234, 0.08), transparent);
+            animation: rotate 10s linear infinite;
+        }
+        
+        .welcome-message h2 {
+            font-size: 2rem;
+            font-weight: 700;
+            margin-bottom: 1.5rem;
+            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", Helvetica, Arial, sans-serif;
+            background: linear-gradient(135deg, rgba(102, 126, 234, 0.9), rgba(118, 75, 162, 0.9));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            position: relative;
+            z-index: 1;
+        }
+        .welcome-message p {
+            font-size: 1.3rem;
+            line-height: 1.7;
+            color: #4a5568;
+            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Helvetica, Arial, sans-serif;
+            position: relative;
+            z-index: 1;
+        }
+        .button {
+            background: linear-gradient(135deg, rgba(102, 126, 234, 0.9) 0%, rgba(118, 75, 162, 0.9) 100%);
+            color: #ffffff;
+            padding: 14px 28px;
+            border-radius: 1.5rem;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            transform: translateZ(0);
+            font-weight: 600;
+            font-size: 1rem;
+            box-shadow: 0 8px 32px rgba(102, 126, 234, 0.25);
+            border: none;
+            position: relative;
+            overflow: hidden;
+            backdrop-filter: blur(10px);
+        }
+        
+        .button::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+            transition: left 0.5s;
+        }
+        
+        .button:hover {
+            background: linear-gradient(135deg, rgba(118, 75, 162, 0.95) 0%, rgba(102, 126, 234, 0.95) 100%);
+            transform: translateY(-3px) scale(1.05);
+            box-shadow: 0 12px 40px rgba(102, 126, 234, 0.35);
+        }
+        
+        .button:hover::before {
+            left: 100%;
+        }
+        
+        .button:active {
+            transform: translateY(-1px) scale(1.02);
+        }
+        .chat-message-content h1, 
+        .chat-message-content h2, 
+        .chat-message-content h3, 
+        .chat-message-content h4, 
+        .chat-message-content h5, 
+        .chat-message-content h6 {
+            margin-top: 1em;
+            margin-bottom: 0.5em;
+            font-weight: 600;
+            color: #272343;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", Helvetica, Arial, sans-serif;
+        }
+        
+        .chat-message-content h1 { font-size: 1.5em; }
+        .chat-message-content h2 { font-size: 1.3em; }
+        .chat-message-content h3 { font-size: 1.1em; }
+        
+        .chat-message-content p {
+            margin-bottom: 1em;
+            line-height: 1.6;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Helvetica, Arial, sans-serif;
+        }
+        
+        .chat-message-content ul, 
+        .chat-message-content ol {
+            margin-bottom: 1em;
+            padding-left: 2em;
+        }
+        
+        .chat-message-content li {
+            margin-bottom: 0.5em;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+        }
+        
+        .chat-message-content code:not(.hljs) {
+            background-color: #f1f3f4;
+            padding: 0.2em 0.4em;
+            border-radius: 0.3em;
+            font-family: "SF Mono", Monaco, "Cascadia Code", "Roboto Mono", Consolas, "Courier New", monospace;
+            color: #495057;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+            border: 1px solid #e9ecef;
+        }
+        
+        .chat-message-content pre {
+            background: #f1f3f4;
+            padding: 1.5em;
+            border-radius: 1rem;
+            overflow-x: auto;
+            margin-bottom: 1em;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+            border: 1px solid #e9ecef;
+            position: relative;
+        }
+        
+        .chat-message-content pre::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, rgba(102, 126, 234, 0.9), rgba(118, 75, 162, 0.9));
+            border-radius: 1rem 1rem 0 0;
+        }
+        
+        .chat-message-content pre code.hljs {
+            padding: 0;
+            border-radius: 0;
+            font-size: 0.9em;
+            line-height: 1.6;
+            background: transparent;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+            font-family: "SF Mono", Monaco, "Cascadia Code", "Roboto Mono", Consolas, "Courier New", monospace;
+            color: #495057;
+        }
+        
+        /* 代码复制按钮样式 */
+        .code-block-container {
+            position: relative;
+            margin: 1em 0;
+        }
+        
+        .copy-button {
+            position: absolute;
+            top: 0.75rem;
+            right: 0.75rem;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 0.75rem;
+            padding: 0.5rem 1rem;
+            font-size: 0.8rem;
+            color: #374151;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Helvetica, Arial, sans-serif;
+            z-index: 10;
+            font-weight: 600;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+        }
+        
+        .copy-button:hover {
+            background: rgba(255, 255, 255, 1);
+            border-color: #667eea;
+            transform: translateY(-2px) scale(1.05);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+        }
+        
+        .copy-button:active {
+            transform: translateY(0) scale(1);
+        }
+        
+        .copy-button.copied {
+            background: linear-gradient(135deg, #10b981, #059669);
+            color: white;
+            border-color: #10b981;
+            animation: pulse-glow 0.6s ease;
+        }
+        
+        .chat-message-content blockquote {
+            border-left: 4px solid #bae8e8;
+            padding-left: 1em;
+            margin-left: 0;
+            color: #4a5568;
+            margin-bottom: 1em;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+        }
+        
+        .chat-message-content table {
+            border-collapse: collapse;
+            width: 100%;
+            margin-bottom: 1em;
+            table-layout: fixed;
+        }
+        
+        .chat-message-content th, 
+        .chat-message-content td {
+            border: 1px solid #e2e8f0;
+            padding: 0.5em;
+            text-align: left;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+        }
+        
+        .chat-message-content th {
+            background-color: #f7fafc;
+        }
+        
+        .chat-message-content tr:nth-child(even) {
+            background-color: #f7fafc;
+        }
+    
+        /* Math expression styling */
+        .math-display {
+            overflow-x: auto;
+            overflow-y: hidden;
+            margin: 1em 0;
+        }
+        
+        .math-inline {
+            color: #2b6cb0;
+        }
+        
+        /* Specific styling for input */
+        input[type="password"] {
+            color: #272343;
+            border-radius: 1rem;
+        }
+        .demo-btn {
+            width: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: flex-start;
+            gap: 1rem;
+            padding: 1.25rem 2rem;
+            font-size: 1.15rem;
+            font-weight: 600;
+            border-radius: 1.5rem;
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            color: #fff;
+            box-shadow: 0 4px 24px rgba(102,126,234,0.10);
+            border: none;
+            outline: none;
+            cursor: pointer;
+            transition: background 0.3s, transform 0.2s, box-shadow 0.3s;
+            margin-bottom: 0;
+        }
+        .demo-btn:hover {
+            background: linear-gradient(90deg, #764ba2 0%, #667eea 100%);
+            transform: translateY(-2px) scale(1.03);
+            box-shadow: 0 8px 32px rgba(102,126,234,0.18);
+        }
+        .demo-card-btn {
+            width: 100%;
+            min-height: 110px;
+            background: linear-gradient(120deg, #e0e7ff 0%, #f3e8ff 100%);
+            border-radius: 1.5rem;
+            box-shadow: 0 4px 24px rgba(102,126,234,0.10);
+            border: 2px solid #e0e7ff;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            justify-content: center;
+            padding: 1.5rem 1.5rem 1.2rem 1.5rem;
+            cursor: pointer;
+            transition: box-shadow 0.3s, border 0.3s, transform 0.2s;
+            position: relative;
+            overflow: hidden;
+        }
+        .demo-card-btn:hover {
+            border: 2px solid #764ba2;
+            box-shadow: 0 8px 32px rgba(102,126,234,0.18);
+            transform: translateY(-2px) scale(1.03);
+            background: linear-gradient(120deg, #e0e7ff 0%, #d1c4e9 100%);
+        }
+        .demo-type {
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: #4f46e5;
+        }
+        .demo-desc {
+            font-size: 0.98rem;
+            color: #6b7280;
+            margin-left: 2.2rem;
+            margin-top: 0.1rem;
+            text-align: left;
+        }
+        .demo-card-btn-demo {
+            width: 100%;
+            min-height: 90px;
+            border-radius: 1.2rem;
+            box-shadow: 0 2px 12px rgba(102,126,234,0.08);
+            border: 2px solid transparent;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            justify-content: center;
+            padding: 1rem 1rem 0.8rem 1rem;
+            cursor: pointer;
+            transition: box-shadow 0.3s, border 0.3s, transform 0.2s, background 0.3s;
+            position: relative;
+            overflow: hidden;
+            font-size: 0.9rem;
+        }
+        .demo-card-btn-demo:hover {
+            border: 2px solid #764ba2;
+            box-shadow: 0 6px 24px rgba(102,126,234,0.13);
+            transform: translateY(-2px) scale(1.03);
+            filter: brightness(1.04);
+        }
+        .demo-type-demo {
+            font-size: 0.95rem;
+            font-weight: 600;
+            color: #374151;
+            line-height: 1.2;
+            width: 100%;
+        }
+        .demo-desc-demo {
+            font-size: 0.85rem;
+            color: #6b7280;
+            margin-left: 2rem;
+            margin-top: 0.3rem;
+            text-align: left;
+            line-height: 1.4;
+        }
+        .demo-panel-anim {
+            transition: transform 0.4s cubic-bezier(.4,2,.6,1), opacity 0.3s;
+            will-change: transform, opacity;
+        }
+        .demo-hide-anim {
+            animation: demoHideToBtn 0.6s cubic-bezier(.4,2,.6,1) forwards;
+        }
+        @keyframes demoHideToBtn {
+            0% {
+                opacity: 1;
+                transform: translate(-50%, -50%) scale(1);
+            }
+            100% {
+                opacity: 0;
+                transform: translate(-50%, -50%) scale(0.8);
+            }
+        }
+        .demo-hide-btn {
+            box-shadow: 0 2px 8px rgba(102,126,234,0.10);
+            transition: box-shadow 0.3s, background 0.3s;
+        }
+        .demo-hide-btn:hover {
+            background: #e0e7ff;
+            box-shadow: 0 4px 16px rgba(102,126,234,0.18);
+        }
+        .demo-fixed-btn {
+            position: fixed;
+            left: calc(24% + 2rem + 1rem);
+            top: 2rem;
+            z-index: 50;
+        }
+        .demo-fixed-btn-text {
+            position: fixed;
+            left: calc(24% + 2rem + 1rem);
+            top: 5rem;
+            z-index: 50;
+            font-size: 0.75rem;
+            color: #6b7280;
+            font-weight: 500;
+            text-align: center;
+            width: 3.5rem;
+        }
+        .demo-panel-center {
+            position: fixed;
+            left: calc(24% + 2rem + (76% - 2rem) / 2);
+            top: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 40;
+            width: 60vw;
+            max-width: 1000px;
+            aspect-ratio: 21/9;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 h-screen overflow-hidden" x-data="appData()">
+<div class="main-container">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+        <div class="flex flex-col h-full p-6">
+            <!-- Fixed content at top -->
+            <div class="space-y-6">
+                <h1 class="text-3xl font-bold text-white mb-4 flex items-center gap-3">
+                    <div class="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center">
+                        <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z" clip-rule="evenodd"></path>
+                        </svg>
+                    </div>
+                    LEAN-LLM-OPT
+                </h1>
+                <!-- API Key -->
+                <div class="space-y-2">
+                    <label class="block text-sm font-semibold text-white mb-2">OpenAI API Key</label>
+                    <input type="password" x-model="apiKey" class="w-full px-4 py-3 bg-white/20 backdrop-blur-sm border border-white/30 rounded-xl text-white placeholder-white/60 focus:outline-none focus:ring-2 focus:ring-white/50 focus:border-white/50 transition-all duration-300">
+                </div>
+                <!-- File Upload -->
+                <div class="space-y-3">
+                    <label class="block text-sm font-semibold text-white mb-2 flex items-center gap-2">
+                        <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM6.293 6.707a1 1 0 010-1.414l3-3a1 1 0 011.414 0l3 3a1 1 0 01-1.414 1.414L11 5.414V13a1 1 0 11-2 0V5.414L7.707 6.707a1 1 0 01-1.414 0z" clip-rule="evenodd"></path>
+                        </svg>
+                        Upload CSV Files
+                    </label>
+                    <div class="flex items-center gap-2">
+                        <button @click="$refs.fileInput.click()" class="px-4 py-2 bg-white/20 backdrop-blur-sm text-white border border-white/30 rounded-xl hover:bg-white/30 transition-all duration-300 font-medium">
+                            Select Files
+                        </button>
+                        <input type="file" multiple accept=".csv" class="hidden" x-ref="fileInput" @change="handleFileSelect($event)">
+                    </div>
+                    <!-- File List -->
+                    <div class="mt-2 space-y-1">
+                        <template x-for="(file, index) in files" :key="index">
+                            <div class="flex items-center justify-between bg-white/20 backdrop-blur-sm rounded-lg px-3 py-2 hover:bg-white/30 transition-all duration-300 ease-out transform hover:scale-105 border border-white/20"
+                                 x-transition:enter="transition ease-out duration-300"
+                                 x-transition:enter-start="opacity-0 transform scale-95"
+                                 x-transition:enter-end="opacity-100 transform scale-100">
+                                <div class="flex items-center gap-2 flex-1 min-w-0">
+                                    <svg class="w-4 h-4 text-white/70 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fill-rule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clip-rule="evenodd"></path>
+                                    </svg>
+                                    <span class="text-xs text-white truncate" x-text="file.name"></span>
+                                </div>
+                                <button @click="removeFile(index)" class="text-white/70 hover:text-red-300 p-1.5 rounded-full hover:bg-red-500/20 transition-all duration-200 ease-out transform hover:scale-110 flex-shrink-0" title="Delete File">
+                                    <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"></path>
+                                    </svg>
+                                </button>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- File Preview - takes remaining space -->
+            <div x-show="filePreviews.length > 0" class="flex-1 overflow-y-auto mt-6">
+                <h3 class="text-sm font-semibold text-white mb-3 flex items-center gap-2">
+                    <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M3 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clip-rule="evenodd"></path>
+                    </svg>
+                    File Preview
+                </h3>
+                <div class="space-y-4">
+                    <template x-for="(preview, index) in filePreviews" :key="index">
+                        <div class="bg-white/20 backdrop-blur-sm rounded-xl p-4 border border-white/20"
+                             x-transition:enter="transition ease-out duration-500"
+                             x-transition:enter-start="opacity-0 transform translate-y-4"
+                             x-transition:enter-end="opacity-100 transform translate-y-0">
+                            <div class="flex items-center justify-between mb-3">
+                                <div class="flex items-center gap-2">
+                                    <svg class="w-5 h-5 text-white/80" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fill-rule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clip-rule="evenodd"></path>
+                                    </svg>
+                                    <h4 class="text-sm font-semibold text-white" x-text="preview.name"></h4>
+                                </div>
+                            </div>
+                            <div class="preview-table">
+                                <table>
+                                    <thead>
+                                        <tr>
+                                            <template x-for="header in preview.headers" :key="header">
+                                                <th class="px-2 py-1 text-left" x-text="header"></th>
+                                            </template>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <template x-for="(row, rowIndex) in preview.data" :key="rowIndex">
+                                            <tr>
+                                                <template x-for="(cell, cellIndex) in row" :key="cellIndex">
+                                                    <td class="px-2 py-1 border-t" x-text="cell"></td>
+                                                </template>
+                                            </tr>
+                                        </template>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+            </div>
+            
+            <!-- 文件上传成功提示 -->
+            <div x-show="showUploadSuccess" 
+                 x-transition:enter="transition ease-out duration-300"
+                 x-transition:enter-start="opacity-0 transform scale-95"
+                 x-transition:enter-end="opacity-100 transform scale-100"
+                 x-transition:leave="transition ease-in duration-200"
+                 x-transition:leave-start="opacity-100 transform scale-100"
+                 x-transition:leave-end="opacity-0 transform scale-95"
+                 class="mt-4 p-4 bg-gradient-to-r from-green-50 to-emerald-50 border border-green-300 text-green-700 rounded-xl flex items-center gap-3 backdrop-blur-sm shadow-lg">
+                <div class="flex-shrink-0">
+                    <svg class="w-6 h-6 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
+                    </svg>
+                </div>
+                <div>
+                    <span class="text-sm font-semibold">File Upload Successful</span>
+                    <p class="text-xs text-green-600 mt-1">Your files have been processed and are ready for analysis</p>
+                </div>
+            </div>
+        </div>
+    </aside>
+    <!-- Right Content Area -->
+    <div class="right-content">
+        <!-- Chat Area -->
+        <div class="chat-container space-y-4" x-ref="chatContainer" style="position:relative;">
+            <!-- Welcome Message -->
+            <div x-show="chatMessages.length === 0" class="welcome-message">
+                <h2>Welcome to LEAN-LLM-OPT</h2>
+                <p>Upload your CSV files and describe your optimization problem to get started.</p>
+            </div>
+            <!-- Demo Panel浮于聊天区正中间，隐藏按钮右上角，收起图标左上角 -->
+            <div style="position: absolute; inset: 0; pointer-events: none; z-index: 30;">
+                <!-- Demo区，聊天区正中间浮层，收缩动画 -->
+                <div
+                    x-show="showDemoPanel || demoHiding"
+                    :class="{'demo-hide-anim': demoHiding}"
+                    @animationend="if(demoHiding){showDemoPanel=false;demoHiding=false;}"
+                    class="demo-panel-center demo-panel-anim"
+                    style="pointer-events: auto;"
+                >
+                    <div class="bg-white/95 shadow-2xl rounded-2xl px-6 py-5 flex flex-col items-center w-full h-full border border-gray-200 relative" style="backdrop-filter: blur(16px);">
+                        <!-- 隐藏按钮，右上角 -->
+                        <button
+                            @click="hideDemoWithAnim()"
+                            class="absolute top-3 right-3 bg-white/80 hover:bg-gray-100 border border-gray-200 rounded-full p-1.5 z-50 demo-hide-btn"
+                            style="pointer-events: auto;"
+                            title="Hide Demo Panel"
+                        >
+                            <span class="text-lg text-blue-700 font-bold">&mdash;</span>
+                        </button>
+                        <div class="w-full flex justify-between items-center mb-5">
+                            <span class="text-sm font-bold text-blue-700 tracking-wide">Try a Demo</span>
+                        </div>
+                        <div class="grid grid-cols-3 gap-3 w-full flex-1">
+                            <template x-for="(demo, idx) in demoList" :key="demo.type">
+                                <button 
+                                    class="demo-card-btn-demo"
+                                    :class="demoColors[idx % demoColors.length]"
+                                    @click="demo.type === 'others' ? handleOthersClick() : handleDemoClick(demo.type)"
+                                >
+                                    <div class="flex items-center gap-2 mb-2 w-full">
+                                        <i :class="demo.icon + ' text-base flex-shrink-0'"></i>
+                                        <span class="demo-type-demo" x-text="demo.title"></span>
+                                    </div>
+                                    <div class="demo-desc-demo" x-text="demo.desc"></div>
+                                </button>
+                            </template>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- 悬浮 Demo 图标，固定位置 -->
+            <div
+                x-show="!showDemoPanel && !demoHiding"
+                x-transition:enter="transition ease-out duration-400"
+                x-transition:enter-start="opacity-0 scale-90"
+                x-transition:enter-end="opacity-100 scale-100"
+                x-transition:leave="transition ease-in duration-300"
+                x-transition:leave-start="opacity-100 scale-100"
+                x-transition:leave-end="opacity-0 scale-90"
+                @click="showDemoPanel=true"
+                class="demo-fixed-btn bg-gradient-to-br from-blue-200 to-purple-200 text-blue-700 shadow-xl rounded-full w-14 h-14 flex items-center justify-center cursor-pointer hover:scale-110 transition-all duration-300"
+                title="Show Demo Panel"
+                style="pointer-events: auto;"
+            >
+                <i class="fa fa-magic text-xl"></i>
+            </div>
+            <!-- Demo 文字标签 -->
+            <div
+                x-show="!showDemoPanel && !demoHiding"
+                x-transition:enter="transition ease-out duration-400"
+                x-transition:enter-start="opacity-0"
+                x-transition:enter-end="opacity-100"
+                x-transition:leave="transition ease-in duration-300"
+                x-transition:leave-start="opacity-100"
+                x-transition:leave-end="opacity-0"
+                class="demo-fixed-btn-text"
+            >
+                Demo
+            </div>
+            <!-- Chat Messages -->
+            <template x-for="(message, index) in chatMessages" :key="index">
+                <div :class="['chat-message', message.role === 'user' ? 'user' : 'assistant']">
+                    <div class="chat-message-content" x-html="DOMPurify.sanitize(marked.parse(message.content))" x-init="
+                        $nextTick(() => {
+                            // 为所有代码块添加复制按钮
+                            const codeBlocks = $el.querySelectorAll('pre code');
+                            codeBlocks.forEach((codeBlock, codeIndex) => {
+                                const preElement = codeBlock.closest('pre');
+                                if (preElement && !preElement.querySelector('.copy-button')) {
+                                    const container = document.createElement('div');
+                                    container.className = 'code-block-container';
+                                    preElement.parentNode.insertBefore(container, preElement);
+                                    container.appendChild(preElement);
+                                    
+                                    const copyButton = document.createElement('button');
+                                    copyButton.className = 'copy-button';
+                                    copyButton.textContent = 'Copy';
+                                    copyButton.onclick = () => copyCode(codeBlock);
+                                    container.appendChild(copyButton);
+                                }
+                            });
+                        });
+                    "></div>
+                </div>
+            </template>
+            <!-- 加载指示器 - 与回答对话框左上对齐 -->
+            <div x-show="(isUploading || isAnalyzing || isSolving)" 
+                 x-transition:enter="transition ease-out duration-400"
+                 x-transition:enter-start="opacity-0 transform scale-95 translate-y-4"
+                 x-transition:enter-end="opacity-100 transform scale-100 translate-y-0"
+                 x-transition:leave="transition ease-in duration-300"
+                 x-transition:leave-start="opacity-100 transform scale-100 translate-y-0"
+                 x-transition:leave-end="opacity-0 transform scale-95 translate-y-4"
+                 class="loading-indicator">
+                <div class="loading-spinner"></div>
+                <div class="flex flex-col">
+                    <span class="loading-text">
+                        <span x-show="isUploading">Building Mathematical Model<span class="loading-dots"></span></span>
+                        <span x-show="isAnalyzing && !isUploading">Analyzing Problem<span class="loading-dots"></span></span>
+                        <span x-show="isSolving && !isUploading && !isAnalyzing">Generating Solution<span class="loading-dots"></span></span>
+                    </span>
+                    <span class="loading-progress">
+                        <span x-show="currentStep === 1">File Embedding<span class="loading-dots"></span></span>
+                        <span x-show="currentStep === 2">Semantic Analysis<span class="loading-dots"></span></span>
+                        <span x-show="currentStep === 3">Template Search<span class="loading-dots"></span></span>
+                        <span x-show="currentStep === 4">Answer Generation<span class="loading-dots"></span></span>
+                    </span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Problem Description (Fixed at Bottom and connected to Sidebar) -->
+    <div class="problem-description-container">
+        <div class="problem-description-inner space-y-4">
+            <div>
+                <label class="block text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
+                    <svg class="w-4 h-4 text-gray-600" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M18 10c0 3.866-3.582 7-8 7a8.841 8.841 0 01-4.083-.98L2 17l1.338-3.123C2.493 12.767 2 11.434 2 10c0-3.866 3.582-7 8-7s8 3.134 8 7zM7 9H5v2h2V9zm8 0h-2v2h2V9zM9 9h2v2H9V9z" clip-rule="evenodd"></path>
+                    </svg>
+                    Problem Description
+                </label>
+                <textarea 
+                    x-model="query" 
+                    x-ref="queryTextarea"
+                    @input="autoResizeTextarea"
+                    rows="2"
+                    class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 auto-resize-textarea"
+                    placeholder="Enter your question here..."></textarea>
+            </div>
+            <div class="flex justify-center">
+                <button @click="uploadFiles()"
+                        :disabled="isUploading || isAnalyzing || isSolving || !apiKey || !query"
+                        class="button">
+                    <span x-show="!isUploading && !isAnalyzing && !isSolving">Start Analysis</span>
+                    <span x-show="isUploading || isAnalyzing || isSolving">Processing...</span>
+                </button>
+            </div>
+            <!-- Error Message -->
+            <div x-show="error" 
+                 x-transition:enter="transition ease-out duration-300"
+                 x-transition:enter-start="opacity-0 transform scale-95"
+                 x-transition:enter-end="opacity-100 transform scale-100"
+                 x-transition:leave="transition ease-in duration-200"
+                 x-transition:leave-start="opacity-100 transform scale-100"
+                 x-transition:leave-end="opacity-0 transform scale-95"
+                 class="bg-gradient-to-r from-red-50 to-red-100 border border-red-300 text-red-700 px-4 py-3 rounded-xl relative text-sm text-center backdrop-blur-sm shadow-lg" role="alert">
+                <div class="flex items-center justify-center gap-2">
+                    <svg class="w-5 h-5 text-red-500" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path>
+                    </svg>
+                    <span x-text="error" class="font-medium"></span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+</div>
+<script>
+function appData() {
+    return {
+        files: [],
+        filePreviews: [],
+        apiKey: '',
+        query: '',
+        isUploading: false,
+        isAnalyzing: false,
+        isSolving: false,
+        currentStep: 0,
+        steps: [
+            'File Embedding',
+            'Semantic Analysis',
+            'Template Search',
+            'Answer Generation'
+        ],
+        progress: 0,
+        chatMessages: [],
+        error: null,
+        progressPercent: 0,
+        completedSteps: [],
+        showUploadSuccess: false,
+        showDemoPanel: true,
+        demoHiding: false,
+        hideDemoWithAnim() {
+            this.demoHiding = true;
+        },
+        handleDemoClick(type) {
+            if (!this.apiKey) {
+                alert('Please enter your API key first.');
+                return;
+            }
+            this.runDemo(type);
+        },
+        handleOthersClick() {
+            // 只有点击动效，不执行实际功能
+            console.log('Others demo clicked - no action taken');
+        },
+        demoList: [
+            {
+                type: 'nrm',
+                title: 'Network Revenue Management',
+                desc: 'Maximize revenue with limited inventory across multiple locations and time periods',
+                icon: 'fa fa-network-wired',
+                csv: ['/static/RunningDemo/NRM/nike Shoes Sales.csv'],
+                txt: '/static/RunningDemo/NRM/NRM.txt'
+            },
+            {
+                type: 'ra',
+                title: 'Resource Allocation',
+                desc: 'Allocate resources efficiently for optimal outcomes in complex decision scenarios',
+                icon: 'fa fa-cubes',
+                csv: ['/static/RunningDemo/RA/capacity.csv', '/static/RunningDemo/RA/products.csv'],
+                txt: '/static/RunningDemo/RA/RA.txt'
+            },
+            {
+                type: 'tp',
+                title: 'Transportation Problem',
+                desc: 'Optimize transport costs and flow distribution between supply and demand points',
+                icon: 'fa fa-truck',
+                csv: ['/static/RunningDemo/TP/customer_demand.csv', '/static/RunningDemo/TP/supply_capacity.csv', '/static/RunningDemo/TP/transportation_costs.csv'],
+                txt: '/static/RunningDemo/TP/TP.txt'
+            },
+            {
+                type: 'flp',
+                title: 'Facility Location',
+                desc: 'Choose optimal facility locations to minimize costs while meeting service requirements',
+                icon: 'fa fa-warehouse',
+                csv: ['/static/RunningDemo/UFLP/demand.csv', '/static/RunningDemo/UFLP/fixed_cost.csv', '/static/RunningDemo/UFLP/transportation_costs.csv'],
+                txt: '/static/RunningDemo/UFLP/UFLP.txt'
+            },
+            {
+                type: 'ap',
+                title: 'Assignment Problem',
+                desc: 'Assign tasks to resources for maximum efficiency and optimal performance outcomes',
+                icon: 'fa fa-tasks',
+                csv: ['/static/RunningDemo/AP/manager_project_costs.csv'],
+                txt: '/static/RunningDemo/AP/AP.txt'
+            },
+            {
+                type: 'others',
+                title: 'Others',
+                desc: 'Solve various custom optimization problems with flexible modeling approaches',
+                icon: 'fa fa-lightbulb',
+                csv: ['/static/RunningDemo/NRM/nike Shoes Sales.csv'], // 临时
+                txt: '/static/RunningDemo/NRM/NRM.txt'
+            }
+        ],
+        demoColors: [
+            'bg-gradient-to-br from-blue-50 to-blue-100',
+            'bg-gradient-to-br from-green-50 to-green-100',
+            'bg-gradient-to-br from-purple-50 to-purple-100',
+            'bg-gradient-to-br from-yellow-50 to-yellow-100',
+            'bg-gradient-to-br from-teal-50 to-teal-100',
+            'bg-gradient-to-br from-gray-50 to-gray-100'
+        ],
+        async runDemo(type) {
+            // Find demo config
+            const demo = this.demoList.find(d => d.type === type);
+            if (!demo) return;
+            this.showDemoPanel = false;
+            // 1. 清空已上传文件和预览
+            this.files = [];
+            this.filePreviews = [];
+            await new Promise(r => setTimeout(r, 1000));
+            // 2. 自动上传csv文件(支持多个文件)
+            const csvFiles = Array.isArray(demo.csv) ? demo.csv : [demo.csv];
+            for (let csvPath of csvFiles) {
+                try {
+                    const csvFile = await fetch(csvPath).then(r => r.blob()).then(blob => new File([blob], csvPath.split('/').pop(), {type: 'text/csv'}));
+                    this.files.push(csvFile);
+                    await this.previewFile(csvFile);
+                } catch (error) {
+                    console.error('Error loading CSV file:', csvPath, error);
+                }
+            }
+            this.currentStep = 1;
+            this.completedSteps = [0];
+            await new Promise(r => setTimeout(r, 1000));
+            // 3. 自动预览已完成，自动填入问题
+            try {
+                const txtContent = await fetch(demo.txt).then(r => r.text());
+                this.query = txtContent;
+                this.$nextTick(() => this.autoResizeTextarea());
+            } catch (error) {
+                console.error('Error loading TXT file:', demo.txt, error);
+                this.query = 'Demo question for ' + demo.title;
+            }
+            await new Promise(r => setTimeout(r, 1000));
+            // 4. 自动点击提交（上传+分析+求解）
+            this.uploadFiles();
+        },
+        autoResizeTextarea() {
+            const textarea = this.$refs.queryTextarea;
+            textarea.style.height = 'auto';
+            const newHeight = Math.min(textarea.scrollHeight, 200);
+            textarea.style.height = newHeight + 'px';
+        },
+        async handleFileSelect(event) {
+            const newFiles = Array.from(event.target.files || event.dataTransfer.files);
+            for (let file of newFiles) {
+                if (file.name.endsWith('.csv')) {
+                    this.files.push(file);
+                    await this.previewFile(file);
+                }
+            }
+            // 设置初始步骤
+            this.currentStep = 0;
+            setTimeout(() => {
+                this.currentStep = 1;
+                this.completedSteps.push(0);
+            }, 500);
+            
+            // 显示文件上传成功提示
+            if (newFiles.length > 0) {
+                setTimeout(() => {
+                    this.showUploadSuccess = true;
+                    // 3秒后自动隐藏
+                    setTimeout(() => {
+                        this.showUploadSuccess = false;
+                    }, 3000);
+                }, 500);
+            }
+        },
+        async previewFile(file) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const text = e.target.result;
+                Papa.parse(text, {
+                    complete: (results) => {
+                        const headers = results.data[0];
+                        const data = results.data.slice(1);
+                        this.filePreviews.push({
+                            name: file.name,
+                            headers: headers,
+                            data: data
+                        });
+                    },
+                    header: false,
+                    skipEmptyLines: true
+                });
+            };
+            reader.readAsText(file);
+        },
+        removeFile(index) {
+            // 保存被删除的文件名用于反馈
+            const deletedFileName = this.files[index].name;
+            
+            // 删除文件和预览
+            this.files.splice(index, 1);
+            this.filePreviews.splice(index, 1);
+            
+            // 显示删除成功的反馈（可选）
+            console.log(`文件 "${deletedFileName}" 已删除`);
+            
+            // 移除文件后不隐藏进度条，因为用户可能想要进行无文件分析
+        },
+        async uploadFiles() {
+            if (!this.query) {
+                this.error = 'Please enter your question';
+                return;
+            }
+            
+            this.isUploading = true;
+            this.error = null;
+            
+            // 保存用户输入的内容
+            const userQuery = this.query;
+            
+            this.chatMessages.push({
+                role: 'user',
+                content: userQuery
+            });
+
+            // 立即清空输入框
+            this.query = '';
+            this.$nextTick(() => {
+                this.autoResizeTextarea();
+            });
+
+            // 自动滚动到底部
+            this.$nextTick(() => {
+                this.scrollToBottom();
+            });
+
+            // 如果有文件，先上传文件
+            if (this.files.length > 0) {
+                const formData = new FormData();
+                for (let file of this.files) {
+                    formData.append('files[]', file);
+                }
+                try {
+                    const response = await fetch('/upload', {
+                        method: 'POST',
+                        body: formData
+                    });
+                    const data = await response.json();
+                    if (data.status === 'success') {
+                        this.currentStep = 2;
+                        this.completedSteps.push(1);
+                        await this.analyze(userQuery);
+                    } else {
+                        throw new Error(data.error || 'Upload failed');
+                    }
+                } catch (error) {
+                    this.error = error.message;
+                }
+            } else {
+                // 如果没有文件，直接进行分析
+                this.currentStep = 2;
+                this.completedSteps.push(1);
+                await this.analyze(userQuery);
+            }
+            
+            this.isUploading = false;
+        },
+        async analyze(query) {
+            if (!query || !this.apiKey) {
+                this.error = 'Please enter your question and API key';
+                return;
+            }
+            this.isAnalyzing = true;
+            try {
+                const response = await fetch('/analyze', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        query: query,
+                        api_key: this.apiKey
+                    })
+                });
+                const data = await response.json();
+                if (data.status === 'success') {
+                    setTimeout(() => {
+                        this.currentStep = 3;
+                    }, 500);
+                    await this.solve(data.problem_type, query);
+                } else {
+                    throw new Error(data.error || 'Analysis failed');
+                }
+            } catch (error) {
+                this.error = error.message;
+            } finally {
+                this.isAnalyzing = false;
+            }
+        },
+        async solve(problemType, query) {
+            this.isSolving = true;
+            try {
+                const response = await fetch('/solve', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        query: query,
+                        api_key: this.apiKey,
+                        problem_type: problemType
+                    })
+                });
+                const data = await response.json();
+                if (data.status === 'success') {
+                    setTimeout(() => {
+                        this.currentStep = 4;
+                    }, 500);
+                    
+                    this.chatMessages.push({
+                        role: 'assistant',
+                        content: data.solution
+                    });
+                    this.$nextTick(() => {
+                        // 自动滚动到底部
+                        this.scrollToBottom();
+                        
+                        // Process math expressions with KaTeX
+                        renderMathInElement(document.body, {
+                            delimiters: [
+                                {left: '$$', right: '$$', display: true},
+                                {left: '$', right: '$', display: false},
+                                {left: '\\\\(', right: '\\\\)', display: false},
+                                {left: '\\\\begin{equation}', right: '\\\\end{equation}', display: true},
+                                {left: '\\\\begin{align}', right: '\\\\end{align}', display: true},
+                                {left: '\\\\begin{alignat}', right: '\\\\end{alignat}', display: true},
+                                {left: '\\\\begin{gather}', right: '\\\\end{gather}', display: true},
+                                {left: '\\\\begin{CD}', right: '\\\\end{CD}', display: true},
+                                {left: '\\\\[', right: '\\\\]', display: true}
+                            ],
+                            macros: {
+                                '\\\\text': '\\\\text',
+                                '\\\\frac': '\\\\frac',
+                                '--': '\\\\cdot'
+                            }
+                        });
+                        
+                        // Highlight code blocks
+                        document.querySelectorAll('pre code').forEach((block) => {
+                            hljs.highlightElement(block);
+                        });
+                    });
+                } else {
+                    throw new Error(data.error || 'Solution failed');
+                }
+            } catch (error) {
+                this.error = error.message;
+            } finally {
+                this.isSolving = false;
+            }
+        },
+        scrollToBottom() {
+            setTimeout(() => {
+                const chatContainer = this.$refs.chatContainer;
+                if (chatContainer) {
+                    chatContainer.scrollTop = chatContainer.scrollHeight;
+                }
+            }, 200);
+        },
+        
+        // 复制代码功能
+        copyCode(codeElement) {
+            const text = codeElement.textContent || codeElement.innerText;
+            navigator.clipboard.writeText(text).then(() => {
+                // 显示复制成功状态
+                const button = event.target;
+                const originalText = button.textContent;
+                button.textContent = 'Copied!';
+                button.classList.add('copied');
+                
+                setTimeout(() => {
+                    button.textContent = originalText;
+                    button.classList.remove('copied');
+                }, 2000);
+            }).catch(err => {
+                console.error('Failed to copy: ', err);
+                // 降级方案
+                const textArea = document.createElement('textarea');
+                textArea.value = text;
+                document.body.appendChild(textArea);
+                textArea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textArea);
+                
+                const button = event.target;
+                const originalText = button.textContent;
+                button.textContent = 'Copied!';
+                button.classList.add('copied');
+                
+                setTimeout(() => {
+                    button.textContent = originalText;
+                    button.classList.remove('copied');
+                }, 2000);
+            });
+        }
+    }
+}
+</script>
+</body>
+</html>
